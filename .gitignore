@@ -1,0 +1,10 @@
+.fable
+.ionide
+bin
+obj
+node_modules
+lib
+out
+esm
+yarn-error.log
+package-lock.json
