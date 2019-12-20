@@ -19,10 +19,10 @@ module InitializationOptions =
     }
 
 // Interface for the pg-promise database object
-type IDatabase =
+type private IDatabase =
   abstract connect : Unit -> Promise<Unit>
 
-  abstract query : string -> Promise<ResizeArray<obj>>
+  abstract query : string -> obj -> Promise<ResizeArray<obj>>
 
   abstract one : string -> Promise<obj>
 
@@ -34,23 +34,10 @@ let private pgp : obj -> string -> IDatabase = jsNative
 [<Emit("(x => x)")>]
 let private magicCast<'T> : obj -> 'T = jsNative
 
-[<Emit("$1.map($0)")>]
-let mapArray (_ : 'T -> 'U) (_ : ResizeArray<'T>) : ResizeArray<'U> = jsNative
-
-type Database (db : IDatabase) =
-
-  member this.Connect () =
-    db.connect ()
-
-  member this.Query<'RowType> (sql : string) =
-    promise {
-      let! records = db.query sql
-
-      return
-        records
-        |> mapArray magicCast<'RowType>
-        // |> List.ofSeq
-    }
+type DatabaseWrapper =
+  private {
+    Database : IDatabase
+  }
 
 let createDatabase initializationOptions connectionString =
   let opts =
@@ -62,4 +49,17 @@ let createDatabase initializationOptions connectionString =
 
   let db = pgp opts connectionString
 
-  Database db
+  { Database = db }
+
+let connect db = promise {
+  do! db.Database.connect ()
+}
+
+let query<'TParams, 'TRow> sql p db = promise {
+  let! records = db.Database.query sql p
+
+  return
+    records
+    |> magicCast<ResizeArray<'TRow>>
+    // |> List.ofSeq
+}
